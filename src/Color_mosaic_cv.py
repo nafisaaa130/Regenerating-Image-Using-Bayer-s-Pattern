@@ -80,14 +80,14 @@ def colorDemosaic(bayerFile):
     if width%6 !=0:
         columns = (width//6)*6
 
-    #generating green pixels from red pixels
+    #generating green pixels from red pixels using adaptive edge-directional interpolation
     for i in range(0, rows, 2):
         for j in range(0, columns, 2):
             #if there isn't pixel info on the next right or bottom edge, mirror
-            if j+2 >= width:
+            if j+4 == rows-1 and i+2<rows:
                 img[i+2][j][1] = img[i+2][j-1][1] #pixel from the left column
 
-            elif i+2 >= height:
+            elif i+4 == columns-1 and j+2 < columns:
                 img[i][j+2][1] = img[i-1][j+2][1] #pixel from the previous row
 
             #pixel has information from all four edges
@@ -101,16 +101,22 @@ def colorDemosaic(bayerFile):
                     img[i+2][j+2][1] = ((int(img[i+1][j+2][1])+int(img[i+3][j+2][1]))/2) - ((int(img[i][j+2][2]) - (2*int(img[i+2][j+2][2])) + int(img[i+4][j+2][2]))/2)
                 else:
                     img[i+2][j+2][1] = ((int(img[i+2][j+1][1])+int(img[i+2][j+3][1])+int(img[i+1][j+2][1])+int(img[i+3][j+2][1]))/4) - ((int(img[i][j+2][2])+int(img[i+2][j][2]) - (4*int(img[i+2][j+2][2])) +int(img[i+2][j+4][2])+int(img[i+4][j+2][2]))/4)
-    
-    #generating green pixels from blue pixels
+                
+                # #filling in any missing green pixel values, with the average of other green pixels
+                # if img[i+2][j+2][1] == 0:
+                #     img[i+2][j+2][1] = (int(img[i+2][j+1][1]) + int(img[i+2][j+3][1]) + int(img[i+1][j+2][1]) + int(img[i+3][j+2][1]))/4
+
+    #generating green pixels from blue pixels using adaptive edge-directional interpolation
     for i in range(1, rows+1, 2):
         for j in range(1, columns+1, 2):
             #if there isn't pixel info on the next right or bottom edge, mirror
-            if j+2 >= width:
+            if j+4 == columns and i+2 < rows+1:
                 img[i+2][j][1] = img[i+2][j-1][1] #pixel from the left column
+                img[i+1][j+1][1] = img[i+1][j][1]
 
-            elif i+2 >= height:
+            elif i+4 == columns and j+2 < columns+1:
                 img[i][j+2][1] = img[i-1][j+2][1] #pixel from the previous row
+                img[i][j][1] = img[i-1][j][1]
 
             #pixel has information from all four edges
             if j+4 < width and i+4 < height:
@@ -123,7 +129,7 @@ def colorDemosaic(bayerFile):
                     img[i+2][j+2][1] = ((int(img[i+1][j+2][1])+int(img[i+3][j+2][1]))/2) - ((int(img[i][j+2][0]) - (2*int(img[i+2][j+2][0])) + int(img[i+4][j+2][0]))/2)
                 else:
                     img[i+2][j+2][1] = ((int(img[i+2][j+1][1])+int(img[i+2][j+3][1])+int(img[i+1][j+2][1])+int(img[i+3][j+2][1]))/4) - ((int(img[i][j+2][0])+int(img[i+2][j][0]) - (4*int(img[i+2][j+2][0])) +int(img[i+2][j+4][0])+int(img[i+4][j+2][0]))/4)
-    
+                
     #mirror the green pixels for the first 2 rows and 2 columns at the beginning - nearest neighbor replication
     #for the 2 rows
     for i in range(0, 2, 2):
@@ -137,16 +143,17 @@ def colorDemosaic(bayerFile):
             img[i][j][1] = img[i][j+1][1]
             img[i+1][j+1][1] = img[i+1][j][1]
 
-    #mirror the edges at the end of the picture (the last rows and columns)- nearest neighbor replication
+    #mirror the edges (green pixels) at the end of the picture (the last rows and columns)- nearest neighbor replication
     #extra rows
     if height%6 !=0:
         row_toggle = 0
         for i in range(rows, height):
             for j in range(0, width, 2):
-                if row_toggle == 0:
-                    img[i][j][1] = img[i-1][j][1]
-                if row_toggle == 1:
-                    img[i][j+1][1] = img[i-1][j+1][1]
+                if j+1 < width-1:
+                    if row_toggle == 0:
+                        img[i][j][1] = img[i][j-1][1]
+                    if row_toggle == 1:
+                        img[i][j+1][1] = img[i][j][1]
             if row_toggle == 0:
                 row_toggle = 1
             else:
@@ -157,40 +164,44 @@ def colorDemosaic(bayerFile):
         col_toggle = 0
         for j in range(columns, width):
             for i in range(0, rows, 2):
-                if col_toggle == 0:
-                    img[i][j][1] = img[i][j-1][1]
-                if col_toggle == 1:
-                    img[i+1][j][1] = img[i+1][j-1][1]
+                if i+1 < height-1:
+                    if col_toggle == 0:
+                        img[i][j][1] = img[i][j-1][1]
+                    if col_toggle == 1:
+                        img[i+1][j][1] = img[i+1][j-1][1]
             if col_toggle == 0:
                 col_toggle = 1
             else:
                 col_toggle = 0
 
     #generating red pixels
-    rows_red = height
-    cols_red = width
-
+    rows = height
+    columns = width
+    #for 4 by 4 window -> using 3x3 window to calculate the interpolate the red pixels
     if height%4 != 0:
-        rows_red = (height//4)*4
+        rows = (height//4)*4
     if width%4 != 0:
-        cols_red = (width//4)*4
-
-    for i in range(0, rows_red, 2):
-        for j in range(0, cols_red, 2):
-            if i+2 >= height and j+2 >= width:
+        columns = (width//4)*4
+    #generating red pixels using adaptive edge-directional interpolation
+    for i in range(0, rows, 2):
+        for j in range(0, columns, 2):
+            if i+1 == height-1 and j+1 == width-1:
                 img[i][j+1][2] = img[i][j][2]
                 img[i+1][j][2] = img[i][j][2]
                 img[i+1][j+1][2] = img[i][j+1][2]
-            elif i+2 >= height:
+                break
+            elif i+1 == height-1 and j+1 < width:
                 img[i+1][j][2] = img[i][j][2]
                 img[i+1][j+1][2] = img[i][j+1][2]
                 img[i+1][j+2][2] = img[i][j+2][2]
-            elif j+2 >= width:
+                break
+            elif j+1 == width-1 and i+1 < height:
                 img[i][j+1][2] = img[i][j][2]
                 img[i+1][j+1][2] = img[i+1][j][2]
                 img[i+2][j+1][2] = img[i+2][j][2]
+                break
 
-            if i+2 < height and j+2 < width:
+            if i+2 < rows-1 and j+2 < columns-1:
                 img[i][j+1][2] = ((int(img[i][j][2])+int(img[i][j+2][2]))/2) - ((int(img[i][j][1]) - (2*int(img[i][j+1][1])) + int(img[i][j+2][1]))/2)
                 img[i+1][j][2] = ((int(img[i][j][2])+int(img[i+2][j][2]))/2) - ((int(img[i][j][1]) - (2*int(img[i+1][j][1])) + int(img[i+2][j][1]))/2)
                 img[i+1][j+2][2] = ((int(img[i][j+2][2])+int(img[i+2][j+2][2]))/2) - ((int(img[i][j+2][1]) - (2*int(img[i+1][j+2][1])) + int(img[i+2][j+2][1]))/2)
@@ -207,18 +218,146 @@ def colorDemosaic(bayerFile):
 
                 else:
                     img[i+1][j+1][2] =  ((int(img[i][j][2])+int(img[i][j+2][2]) + int(img[i+2][j][2]) + int(img[i+2][j+2][2]))/4) - ((int(img[i][j][1]) + int(img[i][j+2][1]) - (4*int(img[i+1][j+1][1])) + int(img[i+2][j][1]) + int(img[i+2][j+2][1]))/4)
+    
+    #mirror the edges (red pixels) at the end of the picture (the last rows and columns)- nearest neighbor replication
+    #extra rows
+    if height%4 !=0:
+        row_toggle = 0
+        for i in range(rows, height):
+            for j in range(0, width, 2):
+                if j+1 < width-1:
+                    if row_toggle == 0:
+                        img[i][j+1][2] = img[i-1][j+1][2]
+                    if row_toggle == 1:
+                        img[i][j][2] = img[i-1][j][2]
+                        img[i][j+1][2] = img[i-1][j+1][2]
+            if row_toggle == 0:
+                row_toggle = 1
+            else:
+                row_toggle = 0
+    
+    # #extra columns
+    if width%4 !=0:
+        col_toggle = 0
+        for j in range(columns, width):
+            for i in range(0, rows, 2):
+                if i+1 < height-1:
+                    if col_toggle == 0:
+                        img[i+1][j][2] = img[i+1][j-1][2]
+                    if col_toggle == 1:
+                        img[i][j][2] = img[i][j-1][2]
+                        img[i+1][j][2] = img[i+1][j-1][2]
+            if col_toggle == 0:
+                col_toggle = 1
+            else:
+                col_toggle = 0
+    
+    
+    rows = height
+    columns = width
+    #for 4 by 4 window -> using 3x3 window to calculate the interpolate the blue pixels
+    if height%4 != 0:
+        rows = (height//4)*4
+    if width%4 != 0:
+        columns = (width//4)*4
+    #generating blue pixels using adaptive edge-directional interpolation
+    for i in range(1, rows+1, 2):
+        for j in range(1, columns+1, 2):
+            if i+1 == height-1 and j+1 == width-1:
+                img[i][j+1][0] = img[i][j][0]
+                img[i+1][j][0] = img[i][j][0]
+                img[i+1][j+1][0] = img[i][j+1][0]
+                break
+            elif i+1 == height-1 and j+1 < width:
+                img[i+1][j][0] = img[i][j][0]
+                img[i+1][j][0] = img[i][j][0]
+                img[i+1][j+1][0] = img[i][j+1][0]
+                break
+            elif j+1 == width-1 and i+1 < height:
+                img[i][j+1][0] = img[i][j][0]
+                img[i+1][j][0] = img[i+1][j-1][0]
+                img[i+1][j+1][0] = img[i+1][j][0]
+                break
 
+            if i+2 < rows and j+2 < columns:
+                img[i][j+1][0] = ((int(img[i][j][0])+int(img[i][j+2][0]))/2) - ((int(img[i][j][1]) - (2*int(img[i][j+1][1])) + int(img[i][j+2][1]))/2)
+                img[i+1][j][0] = ((int(img[i][j][0])+int(img[i+2][j][0]))/2) - ((int(img[i][j][1]) - (2*int(img[i+1][j][1])) + int(img[i+2][j][1]))/2)
+                img[i+1][j+2][0] = ((int(img[i][j+2][0])+int(img[i+2][j+2][0]))/2) - ((int(img[i][j+2][1]) - (2*int(img[i+1][j+2][1])) + int(img[i+2][j+2][1]))/2)
+                img[i+2][j+1][0] = ((int(img[i+2][j][0])+int(img[i+2][j+2][0]))/2) - ((int(img[i+2][j][1]) - (2*int(img[i+2][j+1][1])) + int(img[i+2][j+2][1]))/2)
+
+                horizontal_red = abs(int(img[i][j+2][1]) - (2*int(img[i+1][j+1][1])) + int(img[i+2][j][1])) + abs(int(img[i+2][j][0]) - int(img[i][j+2][0]))
+                vertical_red = abs((int(img[i][j][1]) - (2*int(img[i+1][j+1][1])) + int(img[i+2][j+2][1]))) + abs(int(img[i+2][j+2][0]) - int(img[i][j][0]))
+
+                if horizontal_red < vertical_red:
+                    img[i+1][j+1][0] =  ((int(img[i][j+2][0])+int(img[i+2][j][0]))/2) - ((int(img[i][j+2][1]) - (2*int(img[i+1][j+1][1])) + int(img[i+2][j][1]))/2)
+
+                elif horizontal_red > vertical_red:
+                    img[i+1][j+1][0] =  ((int(img[i][j][0])+int(img[i+2][j+2][0]))/2) - ((int(img[i][j][1]) - (2*int(img[i+1][j+1][1])) + int(img[i+2][j+2][1]))/2)
+
+                else:
+                    img[i+1][j+1][0] =  ((int(img[i][j][0])+int(img[i][j+2][0]) + int(img[i+2][j][0]) + int(img[i+2][j+2][0]))/4) - ((int(img[i][j][1]) + int(img[i][j+2][1]) - (4*int(img[i+1][j+1][1])) + int(img[i+2][j][1]) + int(img[i+2][j+2][1]))/4)
+
+
+    #mirror the edges (blue pixels) at the end of the picture (the last rows and columns)- nearest neighbor replication
+    #extra rows
+    if height%4 !=0:
+        row_toggle = 0
+        for i in range(rows+1, height):
+            for j in range(0, width, 2):
+                if j+1 < width-1:
+                    if row_toggle == 0:
+                        img[i][j][0] = img[i-1][j][0]
+                    if row_toggle == 1:
+                        img[i][j][0] = img[i-1][j][0]
+                        img[i][j+1][0] = img[i-1][j+1][0]
+            if row_toggle == 0:
+                row_toggle = 1
+            else:
+                row_toggle = 0
+    
+    #extra columns
+    if width%4 !=0:
+        col_toggle = 0
+        for j in range(columns+1, width):
+            for i in range(0, rows+1, 2):
+                if i+1 < height-1:
+                    if col_toggle == 0:
+                        img[i][j][0] = img[i][j-1][0]
+                    if col_toggle == 1:
+                        img[i][j][0] = img[i][j-1][0]
+                        img[i+1][j][0] = img[i+1][j-1][0]
+            if col_toggle == 0:
+                col_toggle = 1
+            else:
+                col_toggle = 0
+    
+    #fill in blue pixels for first row - nearest neighbor replication
+    img[1][0][0] = img[1][1][0]
+    for j in range(0, width, 2):
+        img[0][j][0] = img[1][j][0]
+        if j+1 < width-1:
+            img[0][j+1][0] = img[1][j+1][0]
+    #fill in blue pixels for first column - nearest neighbor replication
+    for i in range(2, height, 2):
+        img[i][0][0] = img[i][1][0]
+        if i+1 < height:
+            img[i+1][0][0] = img[i+1][1][0]
 
     return img
 
 if __name__ == "__main__":
-    inputFile = '../images/lights.jpg'
+    #inputFile = '../images/kodim05.png'
     #KEEP as png file for the jor mosaic to be generated properly
-    bayerFile = '../images/lights_modified.png'
+    #bayerFile = '../images/kodim05_bayer.png'
+    #outputFile = '../images/kodim05_regenerated.png'
+    
+    inputFile = '../images/lights.jpg'
+    bayerFile = '../images/lights_bayer.png'
     outputFile = '../images/lights_regenerated.png'
 
-    # createColorMosaic(inputFile, bayerFile)
+    createColorMosaic(inputFile, bayerFile)
     print("Color mosaic of the image has been created")
 
     image1 = colorDemosaic(bayerFile)
+
     cv2.imwrite(outputFile, image1)
