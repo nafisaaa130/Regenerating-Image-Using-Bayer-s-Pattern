@@ -56,7 +56,7 @@ def createColorMosaic(inputfile, bayerFile):
     #cv2.waitKey(0)
 
     cv2.imwrite(bayerFile, img)
-
+#using edge-directed interpolation and nearest neighbor replication
 def colorDemosaic(bayerFile):
     img=cv2.imread(bayerFile, 1)
     #img.shape -> check the dimensions of the array
@@ -96,7 +96,7 @@ def colorDemosaic(bayerFile):
                 vertical_grad = abs(int(img[i][j+2][2]) - (2*int(img[i+2][j+2][2])) + int(img[i+4][j+2][2])) + abs(int(img[i+3][j+2][1]) - int(img[i+1][j+2][1]))
                 
                 if horizontal_grad < vertical_grad:
-                    img[i+2][j+2][1] = ((int(img[i+2][j+1][1])+int(img[i+2][j+3][1]))/2) - (int((img[i+2][j][2]) - (2*int(img[i+2][j+2][2])) + int(img[i+2][j+4][2]))/2)
+                    img[i+2][j+2][1] = ((int(img[i+2][j+1][1])+int(img[i+2][j+3][1]))/2) - ((int(img[i+2][j][2]) - (2*int(img[i+2][j+2][2])) + int(img[i+2][j+4][2]))/2)
                 elif horizontal_grad > vertical_grad:
                     img[i+2][j+2][1] = ((int(img[i+1][j+2][1])+int(img[i+3][j+2][1]))/2) - ((int(img[i][j+2][2]) - (2*int(img[i+2][j+2][2])) + int(img[i+4][j+2][2]))/2)
                 else:
@@ -124,7 +124,7 @@ def colorDemosaic(bayerFile):
                 vertical_grad = abs(int(img[i][j+2][0]) - (2*int(img[i+2][j+2][0])) + int(img[i+4][j+2][0])) + abs(int(img[i+3][j+2][1]) - int(img[i+1][j+2][1]))
                 
                 if horizontal_grad < vertical_grad:
-                    img[i+2][j+2][1] = ((int(img[i+2][j+1][1])+int(img[i+2][j+3][1]))/2) - (int((img[i+2][j][0]) - (2*int(img[i+2][j+2][0])) + int(img[i+2][j+4][0]))/2)
+                    img[i+2][j+2][1] = ((int(img[i+2][j+1][1])+int(img[i+2][j+3][1]))/2) - ((int(img[i+2][j][0]) - (2*int(img[i+2][j+2][0])) + int(img[i+2][j+4][0]))/2)
                 elif horizontal_grad > vertical_grad:
                     img[i+2][j+2][1] = ((int(img[i+1][j+2][1])+int(img[i+3][j+2][1]))/2) - ((int(img[i][j+2][0]) - (2*int(img[i+2][j+2][0])) + int(img[i+4][j+2][0]))/2)
                 else:
@@ -345,19 +345,32 @@ def colorDemosaic(bayerFile):
 
     return img
 
-if __name__ == "__main__":
-    #inputFile = '../images/kodim05.png'
-    #KEEP as png file for the jor mosaic to be generated properly
-    #bayerFile = '../images/kodim05_bayer.png'
-    #outputFile = '../images/kodim05_regenerated.png'
-    
-    inputFile = '../images/lights.jpg'
-    bayerFile = '../images/lights_bayer.png'
-    outputFile = '../images/lights_regenerated.png'
+#calculating the mean square error
+def MSE(orig_img,interpol_img):
+    orig_matrix = cv2.imread(orig_img)
+    interpol_matrix = cv2.imread(interpol_img)
 
+    squared_matrix = np.square(np.subtract(orig_matrix,interpol_matrix))
+    average = squared_matrix.mean()
+
+    return average
+
+if __name__ == "__main__":
+    inputFile = '../images/lights.jpg'
+    #KEEP as png file for the jor mosaic to be generated properly
+    
+    # inputFile = '../images/lights.jpg'
+    bayerFile = '../images/bayer.png'
+    outputFile = '../images/interpolated.png'
+
+    #creating color mosaic
     createColorMosaic(inputFile, bayerFile)
     print("Color mosaic of the image has been created")
 
+    #interpolating the color mosaic
     image1 = colorDemosaic(bayerFile)
-
+    #writing the image array to file
     cv2.imwrite(outputFile, image1)
+    #calculating the MSE
+    MSE = MSE(inputFile,outputFile)
+    print(MSE)
